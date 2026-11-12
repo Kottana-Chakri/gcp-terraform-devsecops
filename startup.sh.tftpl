@@ -1,0 +1,33 @@
+#!/bin/bash
+set -euxo pipefail
+
+mkdir -p /opt/devops-app
+
+cat > /opt/devops-app/app.py <<'APP_EOF'
+${app_source}
+APP_EOF
+
+useradd --system --home-dir /opt/devops-app \
+  --shell /usr/sbin/nologin devopsapp || true
+
+chown -R devopsapp:devopsapp /opt/devops-app
+
+cat > /etc/systemd/system/devops-app.service <<'SERVICE_EOF'
+[Unit]
+Description=DevOps Welcome Application
+After=network.target
+
+[Service]
+User=devopsapp
+WorkingDirectory=/opt/devops-app
+ExecStart=/usr/bin/python3 /opt/devops-app/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+
+systemctl daemon-reload
+systemctl enable devops-app
+systemctl restart devops-app
