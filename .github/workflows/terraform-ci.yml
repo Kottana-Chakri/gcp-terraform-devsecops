@@ -2,12 +2,21 @@
 name: Terraform DevSecOps CI
 
 on:
+  # Run whenever a commit is pushed to any branch
   push:
     branches:
-      - main
+      - '**'
+
+  # Run when a PR targeting main is opened or updated
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+  # Allow manual execution
   workflow_dispatch:
 
 permissions:
@@ -51,9 +60,9 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -X
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.qualitygate.wait=true
 
   trivy:
     name: Trivy IaC Security Scan
