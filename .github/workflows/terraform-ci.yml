@@ -82,3 +82,25 @@ jobs:
           severity: HIGH,CRITICAL
           format: table
           exit-code: '1'
+      
+      - name: Generate SonarQube Excel Report
+        if: always()
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_BRANCH: ${{ github.ref_name }}
+          SONAR_PR: ${{ github.event.pull_request.number }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          python -m pip install requests openpyxl
+          python scripts/sonarqube_report.py
+
+      - name: Upload SonarQube Excel Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonarqube-report-${{ github.run_number }}
+          path: reports/sonarqube-report.xlsx
+          if-no-files-found: warn
+          retention-days: 30
+
