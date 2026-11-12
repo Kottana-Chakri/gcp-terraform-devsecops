@@ -7,6 +7,7 @@ resource "google_compute_network" "devops_vpc" {
 
   description = "VPC created using Terraform"
 }
+#hi
 
 # 2. Create a subnet inside the VPC
 
