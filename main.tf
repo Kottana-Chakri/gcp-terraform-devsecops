@@ -1,4 +1,4 @@
-
+#qwerty
 # 1. Create a custom VPC
 
 resource "google_compute_network" "devops_vpc" {
