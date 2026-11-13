@@ -21,9 +21,9 @@ permissions:
 
 jobs:
 
-  # --------------------------------
+  # -----------------------------------
   # JOB 1: TERRAFORM VALIDATION
-  # --------------------------------
+  # -----------------------------------
   terraform-checks:
     name: Terraform Format and Validate
     runs-on: ubuntu-latest
@@ -45,9 +45,9 @@ jobs:
         run: terraform validate
 
 
-  # --------------------------------
+  # -----------------------------------
   # JOB 2: SONARQUBE ANALYSIS
-  # --------------------------------
+  # -----------------------------------
   sonarqube:
     name: SonarQube Cloud Analysis
     runs-on: ubuntu-latest
@@ -70,9 +70,9 @@ jobs:
             -Dsonar.qualitygate.wait=true
 
 
-  # --------------------------------
+  # -----------------------------------
   # JOB 3: TRIVY SECURITY SCAN
-  # --------------------------------
+  # -----------------------------------
   trivy:
     name: Trivy IaC Security Scan
     runs-on: ubuntu-latest
@@ -93,9 +93,9 @@ jobs:
           exit-code: '1'
 
 
-  # --------------------------------
-  # JOB 4: GENERATE SONARQUBE REPORT
-  # --------------------------------
+  # -----------------------------------
+  # JOB 4: GENERATE SONARQUBE EXCEL
+  # -----------------------------------
   sonarqube-report:
     name: Generate SonarQube Excel Report
     runs-on: ubuntu-latest
@@ -104,7 +104,9 @@ jobs:
       - terraform-checks
       - sonarqube
 
-    # Generate the report even if the SonarQube quality gate fails.
+    # Run even when the SonarQube Quality Gate fails.
+    # Do not run if Terraform validation failed,
+    # or the SonarQube job was cancelled/skipped.
     if: >-
       always() &&
       needs.terraform-checks.result == 'success' &&
@@ -122,16 +124,16 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install report dependencies
         run: python -m pip install requests openpyxl
 
-      - name: Generate Excel report
+      - name: Generate SonarQube Excel Report
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
-          SONAR_BRANCH: ${{ github.ref_name }}
+          SONAR_BRANCH: ${{ github.head_ref || github.ref_name }}
           SONAR_PR: ${{ github.event.pull_request.number }}
-          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: python scripts/sonarqube_report.py
 
       - name: Upload SonarQube Excel Report
@@ -144,24 +146,22 @@ jobs:
           retention-days: 30
 
 
-  # --------------------------------
-  # JOB 5: CREATE TAIGA ISSUES
-  # --------------------------------
+  # -----------------------------------
+  # JOB 5: TAIGA AUTOMATION
+  # -----------------------------------
   taiga-sync:
-    name: Create Taiga Security Tasks
+    name: Create and Assign Taiga Security Tasks
 
-    # This runner must be installed on your Windows PC
-    # where Docker Taiga is running.
+    # Must be a self-hosted Windows runner on the
+    # same computer where Taiga Docker is running.
     runs-on: [self-hosted, Windows, X64, taiga-local]
 
     needs:
       - sonarqube-report
 
-    # Synchronize only main branch pushes and manual runs on main.
-    if: >-
-      needs.sonarqube-report.result == 'success' &&
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # Do not skip because of the SonarQube Quality Gate.
+    # Run whenever the report job succeeds.
+    if: ${{ always() && needs.sonarqube-report.result == 'success' }}
 
     steps:
       - name: Checkout repository
@@ -174,26 +174,39 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install Taiga integration dependencies
         run: python -m pip install pandas openpyxl requests
 
-      - name: Download SonarQube report
+      - name: Download SonarQube Excel Report
         uses: actions/download-artifact@v4
         with:
           name: sonarqube-report-${{ github.run_number }}
           path: reports
+
+      - name: Verify report exists
+        shell: pwsh
+        run: |
+          if (!(Test-Path ".\reports\sonarqube-report.xlsx")) {
+            throw "SonarQube Excel report was not downloaded."
+          }
+
+          Write-Host "SonarQube report found."
 
       - name: Check Taiga connectivity
         shell: pwsh
         env:
           TAIGA_URL: ${{ vars.TAIGA_URL }}
         run: |
-          $url = "$env:TAIGA_URL/api/v1/"
-          $response = Invoke-WebRequest -Uri $url -UseBasicParsing
+          $response = Invoke-WebRequest `
+            -Uri "$env:TAIGA_URL/api/v1/" `
+            -UseBasicParsing
+
           Write-Host "Taiga API status: $($response.StatusCode)"
 
-      - name: Synchronize findings with Taiga
+      - name: Synchronize SonarQube findings with Taiga
         env:
           TAIGA_URL: ${{ vars.TAIGA_URL }}
           TAIGA_TOKEN: ${{ secrets.TAIGA_TOKEN }}
+          TAIGA_PROJECT_ID: '1'
+          TAIGA_USER_MAP: ${{ vars.TAIGA_USER_MAP }}
         run: python taiga_integration.py

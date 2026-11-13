@@ -1,6 +1,40 @@
+
+# Terraform
 .terraform/
 *.tfstate
 *.tfstate.*
-*.tfvars
 *.tfplan
 crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform variables containing secrets
+terraform.tfvars
+terraform.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# SonarQube generated reports
+reports/
+
+# Local credentials and tokens
+*.pem
+*.key
+credentials.json
+service-account.json
+
+# IDE and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
