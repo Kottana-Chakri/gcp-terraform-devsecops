@@ -174,17 +174,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Use the existing Windows Python installation.
+      # Use existing Windows Python installation.
       # Do not use actions/setup-python on this runner.
       - name: Verify Python
-        shell: pwsh
+        shell: powershell
         run: |
           python --version
           python -m pip --version
           where.exe python
 
       - name: Install Taiga integration dependencies
-        shell: pwsh
+        shell: powershell
         run: |
           python -m pip install pandas openpyxl requests
 
@@ -195,7 +195,7 @@ jobs:
           path: reports
 
       - name: Verify report exists
-        shell: pwsh
+        shell: powershell
         run: |
           if (!(Test-Path ".\reports\sonarqube-report.xlsx")) {
             throw "SonarQube Excel report was not downloaded."
@@ -204,7 +204,7 @@ jobs:
           Write-Host "SonarQube report found."
 
       - name: Check Taiga connectivity
-        shell: pwsh
+        shell: powershell
         env:
           TAIGA_URL: ${{ vars.TAIGA_URL }}
         run: |
@@ -215,10 +215,11 @@ jobs:
           Write-Host "Taiga API status: $($response.StatusCode)"
 
       - name: Synchronize SonarQube findings with Taiga
-        shell: pwsh
+        shell: powershell
         env:
           TAIGA_URL: ${{ vars.TAIGA_URL }}
           TAIGA_TOKEN: ${{ secrets.TAIGA_TOKEN }}
           TAIGA_PROJECT_ID: '1'
           TAIGA_USER_MAP: ${{ vars.TAIGA_USER_MAP }}
-        run: python .\taiga_integration.py
+        run: |
+          python .\taiga_integration.py
