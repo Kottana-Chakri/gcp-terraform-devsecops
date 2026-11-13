@@ -119,10 +119,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Verify Python
+  shell: pwsh
+  run: |
+    python --version
+    python -m pip --version
+    where.exe python
 
       - name: Install report dependencies
         run: python -m pip install requests openpyxl
